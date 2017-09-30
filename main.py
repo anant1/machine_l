@@ -1,106 +1,129 @@
-###Main code for the HW1
-
-print("UBitName:"+ "anantram")
-print("personNumber:" + "50249127")
+###########################################################################
+## This code is to explore some probability distribution concepts of machine learning using a data sets of US colleges from usnews.com
+## Author: Anant Gupta
+###########################################################################
 
 
 import pandas as pd
 import numpy as np
-import statistics as st
 import matplotlib.pyplot as plt
-
-file = 'university data.xlsx'
-pfile = pd.ExcelFile(file)
-sheetname = pfile.sheet_names
-dataframe = pfile.parse('university_data')
-
-X1 = np.array([dataframe['CS Score (USNews)'][0:49]])
-X2 = np.array([dataframe['Research Overhead %'][0:49]])
-X3 = np.array([dataframe['Admin Base Pay$'][0:49]])
-X4 = np.array([dataframe['Tuition(out-state)$'][0:49]])
+import scipy  as scipy
+import math
+import seaborn as sns
 
 
-mu1 = np.mean(X1)
-mu2 = np.mean(X2)
-mu3 = np.mean(X3)
-mu4 = np.mean(X4)
+data=pd.read_excel("/university data.xlsx")
 
-var1 = np.var(X1)
-var2 = np.var(X2)
-var3 = np.var(X3)
-var4 = np.var(X4)
+df= pd.DataFrame(data)
+df=df.drop(df.index[49])  ###to delete last Nan row
 
-sigma1 = np.std(X1)
-sigma2 = np.std(X2)
-sigma3 = np.std(X3)
-sigma4 = np.std(X4)
+X= df.iloc[:,2:6]
+Y=df.iloc[:,7]
 
-##############################################################################2
-covls = []
-corls = []
-for i in [X1,X2,X3,X4]:
-    for j in [X1,X2,X3,X4]:
-	    covls.append(np.cov(i,j)[0][1])
-		corls.append(np.corrcoef(i,j)[0][1])
-		plt.plot(i,j)
-		plt.show()
-		
+mu	= X.apply(np.mean)
+sigma = X.apply(np.std)
+var = X.apply(np.var)
 
-arr = np.array(covls)
-arr1 = np.array(corls)
-a,b,c,d = np.split(arr,4)
-a1,b1,c1,d1 = np.split(arr1,4)
-covarianceMat = np.matrix([a,b,c,d])
-correlationMat = np.matrix([a1,b1,c1,d1])
+mu1= mu[0];
+mu2= mu[1];
+mu3= mu[2];
+mu4= mu[3];
+
+sigma1= sigma[0];
+sigma2= sigma[1];
+sigma3= sigma[2];
+sigma4= sigma[3];
+
+var1= var[0];
+var2= var[1];
+var3= var[2];
+var4= var[3];
+
+covarianceMat= pd.DataFrame.cov(X)
+
+correlationMat= pd.DataFrame.corr(X)
+
+##Correlation matrix Heat plot for analysing the correlation
+multiGraph= sns.heatmap(correlationMat, vmax=1., square=False).xaxis.tick_top()
 
 
-#################################################################################3
-Assuming that each variable is normally distributed and that they are independent of each
-other, determine the log-likelihood of the data (Use the means and variances computed
-earlier to determine the likelihood of each data value.)
+###All-in-One scatter plot
+pd.tools.plotting.scatter_matrix(X, diagonal="kde")
 
-from scipy.stats import norm,multivariate_normal
-vector = []
-logLikelihood = 0
-multlogLikelihood = 0
+
+### Separate Pairwise scatter Plots
+sns.lmplot('CS Score (USNews)', 'Research Overhead %', X, hue='CS Score (USNews)', fit_reg=False);
+sns.lmplot('CS Score (USNews)', 'Admin Base Pay$', X, hue='CS Score (USNews)', fit_reg=False);
+sns.lmplot('CS Score (USNews)', 'Tuition(out-state)$', X, hue='CS Score (USNews)', fit_reg=False);
+
+sns.lmplot('Research Overhead %', 'Admin Base Pay$', X, hue='Research Overhead %', fit_reg=False);
+sns.lmplot('Research Overhead %', 'Tuition(out-state)$', X, hue='Research Overhead %', fit_reg=False);
+
+sns.lmplot('Admin Base Pay$', 'Tuition(out-state)$', X, hue='Admin Base Pay$', fit_reg=False);
+
+
+
+###Univariate PDF, Using scipy.stats.norm.pdf()
+
+uni_log=0
+logLikelihood_univariate=0
+for i in range(0,4):
+     pdf= scipy.stats.norm.pdf(X.iloc[:,i], mu[i], sigma[i])
+     uni_log = uni_log + np.sum(np.log(pdf))
+
+
+logLikelihood_univariate = uni_log
+
+
+###Multivariate PDF, using inbuilt function scipy.stats.multivariate_normal.pdf()
+
+multiVar_log=0
+logLikelihood_multivariate1=0
 for i in range(0,49):
-	l=[]
-	v2=[]
-	matl = [X1.transpose(),X2.transpose(),X3.transpose(),X4.transpose()]
-	meanm = [mu1,mu2,mu3,mu4]
-	stdm = [sigma1,sigma2,sigma3,sigma4]
-    for j,k,m in zip(matl,meanm,stdm):
-		l.append(norm(k,m).pdf(j[i,0]))
-		v2.append(j[i,0])
-	multlogLikelihood = multlogLikelihood + np.log(multivariate_normal.pdf(v2,meanm,covarianceMat,allow_singular=True))
-    vector.append(l)
-for i in vector:
-	a = 1
-    for j in i:
-		a = a * j
-    logLikelihood = logLikelihood + np.log(a)
-print(logLikelihood)#-1315.09879256
-print(multlogLikelihood)
+     multiVar_log= multiVar_log + math.log(scipy.stats.multivariate_normal.pdf(X.iloc[i,:],mu,covarianceMat, allow_singular=True))
 
-#####For multivariate 
+logLikelihood_multivariate1 = multiVar_log
 
 
-##################################################################################4
-Using the correlation values construct a Bayesian network which results in a higher log-
-likelihood than in 3.
+covarianceMat= np.matrix(covarianceMat)
+#### Multivariate PDF Formula Implemented
+def multivariate(v2,meanm,covarianceMat):
+	v2 = np.array(v2)
+	meanm = np.array(meanm)
+	size = len(v2)
+	if size == len(meanm) and (size, size) == covarianceMat.shape:
+		det = np.linalg.det(covarianceMat)
+		if det == 0:
+			raise NameError("The covariance matrix can't be singular")
+		norm_const = 1.0/ ( math.pow((2*math.pi),float(size)/2) * math.pow(det,1.0/2) )
+		x_mu = np.matrix(v2 - meanm)
+		inv = covarianceMat.I
+		result = math.pow(math.e, -0.5 * (x_mu * inv * x_mu.T))
+		return norm_const * result
+	else:
+		raise NameError("The dimensions of the input don't match")
 
-BNgraph:
-A 4-by-4 matrix representing the acyclic directed graph showing the connections
-of the Bayesian network. Each entry of the matrix takes value 0 or 1.
+######Multivariate_PDF using implemented formula for Multivariate pdf
+multiVar_log=0
+logLikelihood_multivariate2=0
+for i in range(0,49):
+     multiVar_log= multiVar_log + math.log(multivariate(X.iloc[i,:],mu,covarianceMat))
 
-BNlogLikelihood:
-A scalar showing log-likelihood produced by your Bayesian network.
-The higher it is, the better score you get. Of course, it must match with the structure of
-of network.
-
+logLikelihood_multivariate2 = multiVar_log
 
 
+###########Printing outputs after rounding off to 3 decimals
+np.set_printoptions(formatter={'float': lambda x: "{0:0.3f}".format(x)})
+var = np.array(var)
+
+print('\nmu1: ',mu1,'\nmu2: ',mu2,'\nmu3: ',mu3,'\nmu4: ',mu4)
+print('\nvar1: ',np.around(var[0], decimals=3),'\nvar2: ',np.around(var[1], decimals=3),'\nvar3: ',np.around(var[2], decimals=3),'\nvar4: ',np.around(var[3], decimals=3))
+print('\nsigma1: ',sigma1,'\nsigma2: ',sigma2,'\nsigma3: ',sigma3,'\nsigma4: ',sigma4)
 
 
-########################################################5
-Using the Bayesian network to determine some interesting conditional probabilities
+print('\ncovarianceMat: ', covarianceMat)
+print('\ncorrelationMat: ', correlationMat)
+
+print('\nlogLikelihood_univariate: ', logLikelihood_univariate)
+print('\nlogLikelihood_multivariate1: ', logLikelihood_multivariate1)
+print('\nlogLikelihood_multivariate2: ', logLikelihood_multivariate2)
